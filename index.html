@@ -4,14 +4,24 @@
   <meta charset="UTF-8">
   <title>Table Tennis Game - Game Over and Speed by Difficulty</title>
   <style>
-    body { background: #222; display: flex; flex-direction: column; align-items: center; height: 100vh; margin: 0;}
+    body {
+      background: #222;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      height: 100vh;
+      margin: 0;
+    }
     #game-container {
       display: flex;
       flex-direction: column;
       align-items: center;
-      position: relative; /* This will anchor absolute children */
+      position: relative;
     }
-    canvas { background: #fff; display: block; }
+    canvas {
+      background: #fff;
+      display: block;
+    }
     #difficulty {
       margin: 1em;
       font-size: 1.2em;
@@ -25,22 +35,20 @@
       font-size: 1em;
     }
     #game-over {
-      position: absolute;
-      top: 60px;
-      left: 0;
-      width: 600px;
-      height: 400px;
-      background: rgba(0,0,0,0.85);
       display: none;
+      position: fixed;            /* Float above everything */
+      left: 0;
+      top: 0;
+      width: 100vw;
+      height: 100vh;
+      background: rgba(0,0,0,0.9);
       color: #fff;
-      padding: 2em 1em 1em;
-      border-radius: 12px;
-      font-size: 2em;
-      text-align: center;
-      z-index: 10;
       font-family: sans-serif;
+      z-index: 100;
       align-items: center;
       justify-content: center;
+      flex-direction: column;
+      font-size: 2em;
     }
     #restart-btn {
       font-size: 1em;
@@ -69,10 +77,10 @@
   </select>
   <div id="missed-counter">Missed: 0 / 10</div>
   <canvas id="pong" width="600" height="400"></canvas>
-  <div id="game-over">
-    <div id="game-over-msg">Game Over!<br>You missed too many times.</div>
-    <button id="restart-btn">Restart</button>
-  </div>
+</div>
+<div id="game-over">
+  <div id="game-over-msg">Game Over!</div>
+  <button id="restart-btn">Restart</button>
 </div>
 <script>
 const canvas = document.getElementById('pong');
@@ -80,8 +88,8 @@ const ctx = canvas.getContext('2d');
 const selectDifficulty = document.getElementById('difficulty');
 const missedCounter = document.getElementById('missed-counter');
 const gameOverDiv = document.getElementById('game-over');
-const restartBtn = document.getElementById('restart-btn');
 const gameOverMsg = document.getElementById('game-over-msg');
+const restartBtn = document.getElementById('restart-btn');
 
 // Paddle
 const paddleWidth = 10, paddleHeight = 70, paddleSpeed = 6;
@@ -152,6 +160,7 @@ function draw() {
 }
 
 function update() {
+  if (!running) return; // Don't update or move when not running!
   // Move player paddle
   if (upPressed && leftY > 0) leftY -= paddleSpeed;
   if (downPressed && leftY < canvas.height-paddleHeight) leftY += paddleSpeed;
@@ -207,7 +216,7 @@ function update() {
 
 function showGameOver() {
   running = false;
-  gameOverMsg.innerHTML = `Game Over!<br>You missed ${missed} times.<br>Press "Restart" or Space to try again.`;
+  gameOverMsg.innerHTML = `Game Over!<br>You missed ${missed} times (<b>limit: ${maxMisses}</b>).<br><br>Press "Restart" or Space to try again.`;
   gameOverDiv.style.display = "flex";
 }
 
