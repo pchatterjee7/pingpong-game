@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Table Tennis Game - Difficulty Levels</title>
+  <style>
+    body { background: #222; display: flex; flex-direction: column; align-items: center; height: 100vh; margin: 0; }
+    #game-container { display: flex; flex-direction: column; align-items: center; }
+    canvas { background: #fff; display: block; }
+    #difficulty {
+      margin: 1em;
+      font-size: 1.2em;
+      padding: 0.4em 0.6em;
+      border-radius:5px;
+      border: none;
+    }
+    label { color: #fff; font-family: sans-serif; font-size: 1em;}
+  </style>
+</head>
+<body>
+<div id="game-container">
+  <label for="difficulty">Select Difficulty: </label>
+  <select id="difficulty">
+    <option value="easy">Easy</option>
+    <option value="medium" selected>Medium</option>
+    <option value="hard">Hard</option>
+  </select>
+  <canvas id="pong" width="600" height="400"></canvas>
+</div>
+<script>
+const canvas = document.getElementById('pong');
+const ctx = canvas.getContext('2d');
+const selectDifficulty = document.getElementById('difficulty');
+
+// Paddle
+const paddleWidth = 10, paddleHeight = 70, paddleSpeed = 6;
+let leftY = canvas.height/2 - paddleHeight/2;
+let rightY = canvas.height/2 - paddleHeight/2;
+
+// Ball
+let ballX = canvas.width/2, ballY = canvas.height/2;
+let ballRadius = 8;
+let ballSpeedX = 4, ballSpeedY = 4;
+
+// Controls
+let upPressed = false, downPressed = false;
+
+// AI Settings for each difficulty level
+const aiSettings = {
+  easy:   { aiSpeed: 2 },
+  medium: { aiSpeed: 4 },
+  hard:   { aiSpeed: 6 }
+};
+let currentDifficulty = 'medium'; // default
+
+function moveAI() {
+  // Get the AI speed for current difficulty setting
+  let aiSpeed = aiSettings[currentDifficulty].aiSpeed;
+  let paddleMid = rightY + paddleHeight/2;
+  if (paddleMid < ballY - 10)
+    rightY += aiSpeed;
+  else if (paddleMid > ballY + 10)
+    rightY -= aiSpeed;
+  // Don't let paddle go out of bounds
+  rightY = Math.max(0, Math.min(canvas.height - paddleHeight, rightY));
+}
+
+// Draw everything
+function draw() {
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+
+  // Middle line
+  ctx.fillStyle = "#ccc";
+  ctx.fillRect(canvas.width/2-1, 0, 2, canvas.height);
+
+  // Left Paddle (Player)
+  ctx.fillStyle = "#2e8b57";
+  ctx.fillRect(10, leftY, paddleWidth, paddleHeight);
+
+  // Right Paddle (AI)
+  ctx.fillStyle = "#c0392b";
+  ctx.fillRect(canvas.width-20, rightY, paddleWidth, paddleHeight);
+
+  // Ball
+  ctx.beginPath();
+  ctx.arc(ballX, ballY, ballRadius, 0, Math.PI*2);
+  ctx.fillStyle = "#444";
+  ctx.fill();
+  ctx.closePath();
+}
+
+// Move ball and paddles
+function update() {
+  // Move player paddle
+  if (upPressed && leftY > 0) leftY -= paddleSpeed;
+  if (downPressed && leftY < canvas.height-paddleHeight) leftY += paddleSpeed;
+
+  moveAI();
+
+  // Move ball
+  ballX += ballSpeedX;
+  ballY += ballSpeedY;
+
+  // Collision with top/bottom
+  if (ballY-ballRadius < 0 || ballY+ballRadius > canvas.height)
+    ballSpeedY = -ballSpeedY;
+
+  // Left paddle collision
+  if (ballX-ballRadius < 20 && ballY > leftY && ballY < leftY+paddleHeight) {
+    ballSpeedX = -ballSpeedX;
+    ballX = 20+ballRadius; // Prevent sticking
+  }
+
+  // Right paddle collision
+  if (ballX+ballRadius > canvas.width-20 && ballY > rightY && ballY < rightY+paddleHeight) {
+    ballSpeedX = -ballSpeedX;
+    ballX = canvas.width-20-ballRadius; // Prevent sticking
+  }
+
+  // Score reset
+  if (ballX-ballRadius < 0 || ballX+ballRadius > canvas.width) {
+    ballX = canvas.width/2;
+    ballY = canvas.height/2;
+    // Change direction
+    ballSpeedX = -ballSpeedX;
+    ballSpeedY = 4 * (Math.random() > 0.5 ? 1 : -1);
+  }
+}
+
+// Game loop
+function loop() {
+  update();
+  draw();
+  requestAnimationFrame(loop);
+}
+
+// Listen to keyboard
+document.addEventListener('keydown', function(e){
+  if (e.key === "ArrowUp") upPressed = true;
+  if (e.key === "ArrowDown") downPressed = true;
+});
+document.addEventListener('keyup', function(e){
+  if (e.key === "ArrowUp") upPressed = false;
+  if (e.key === "ArrowDown") downPressed = false;
+});
+
+// Listen to difficulty selector
+selectDifficulty.addEventListener('change', function() {
+  currentDifficulty = selectDifficulty.value;
+  // Reset game when difficulty changes
+  leftY = canvas.height/2 - paddleHeight/2;
+  rightY = canvas.height/2 - paddleHeight/2;
+  ballX = canvas.width/2;
+  ballY = canvas.height/2;
+  ballSpeedX = 4 * (Math.random() > 0.5 ? 1 : -1);
+  ballSpeedY = 4 * (Math.random() > 0.5 ? 1 : -1);
+});
+
+loop();
+</script>
+</body>
+</html>
