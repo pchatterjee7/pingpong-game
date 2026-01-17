@@ -2,10 +2,15 @@
 <html>
 <head>
   <meta charset="UTF-8">
-  <title>Table Tennis Game - Difficulty Levels</title>
+  <title>Table Tennis Game - Game Over and Speed by Difficulty</title>
   <style>
-    body { background: #222; display: flex; flex-direction: column; align-items: center; height: 100vh; margin: 0; }
-    #game-container { display: flex; flex-direction: column; align-items: center; }
+    body { background: #222; display: flex; flex-direction: column; align-items: center; height: 100vh; margin: 0;}
+    #game-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      position: relative; /* This will anchor absolute children */
+    }
     canvas { background: #fff; display: block; }
     #difficulty {
       margin: 1em;
@@ -14,7 +19,44 @@
       border-radius:5px;
       border: none;
     }
-    label { color: #fff; font-family: sans-serif; font-size: 1em;}
+    label {
+      color: #fff;
+      font-family: sans-serif;
+      font-size: 1em;
+    }
+    #game-over {
+      position: absolute;
+      top: 60px;
+      left: 0;
+      width: 600px;
+      height: 400px;
+      background: rgba(0,0,0,0.85);
+      display: none;
+      color: #fff;
+      padding: 2em 1em 1em;
+      border-radius: 12px;
+      font-size: 2em;
+      text-align: center;
+      z-index: 10;
+      font-family: sans-serif;
+      align-items: center;
+      justify-content: center;
+    }
+    #restart-btn {
+      font-size: 1em;
+      padding: 0.35em 1.3em;
+      border-radius: 8px;
+      margin-top: 1em;
+      background: #2e8b57;
+      color: #fff;
+      border: none;
+      cursor: pointer;
+    }
+    #missed-counter {
+      color: #fff;
+      font-family: sans-serif;
+      margin-bottom: 5px;
+    }
   </style>
 </head>
 <body>
@@ -25,47 +67,67 @@
     <option value="medium" selected>Medium</option>
     <option value="hard">Hard</option>
   </select>
+  <div id="missed-counter">Missed: 0 / 10</div>
   <canvas id="pong" width="600" height="400"></canvas>
+  <div id="game-over">
+    <div id="game-over-msg">Game Over!<br>You missed too many times.</div>
+    <button id="restart-btn">Restart</button>
+  </div>
 </div>
 <script>
 const canvas = document.getElementById('pong');
 const ctx = canvas.getContext('2d');
 const selectDifficulty = document.getElementById('difficulty');
+const missedCounter = document.getElementById('missed-counter');
+const gameOverDiv = document.getElementById('game-over');
+const restartBtn = document.getElementById('restart-btn');
+const gameOverMsg = document.getElementById('game-over-msg');
 
 // Paddle
 const paddleWidth = 10, paddleHeight = 70, paddleSpeed = 6;
-let leftY = canvas.height/2 - paddleHeight/2;
-let rightY = canvas.height/2 - paddleHeight/2;
+let leftY, rightY;
 
 // Ball
-let ballX = canvas.width/2, ballY = canvas.height/2;
-let ballRadius = 8;
-let ballSpeedX = 4, ballSpeedY = 4;
+let ballX, ballY, ballRadius = 8, ballSpeedX, ballSpeedY;
 
 // Controls
 let upPressed = false, downPressed = false;
 
-// AI Settings for each difficulty level
-const aiSettings = {
-  easy:   { aiSpeed: 2 },
-  medium: { aiSpeed: 4 },
-  hard:   { aiSpeed: 6 }
+// AI and miss/ball speed for each difficulty
+const difficultySettings = {
+  easy:   { aiSpeed: 2,   maxMisses: 20, ballSpeed: 3 },
+  medium: { aiSpeed: 4,   maxMisses: 10, ballSpeed: 5 },
+  hard:   { aiSpeed: 6,   maxMisses: 5,  ballSpeed: 8 }
 };
 let currentDifficulty = 'medium'; // default
+let running = true;
+let missed = 0;
+let maxMisses = 10;
+let ballSpeedSetting = 5;
+
+function resetPositions(randomDir = true) {
+  leftY = canvas.height/2 - paddleHeight/2;
+  rightY = canvas.height/2 - paddleHeight/2;
+  ballX = canvas.width/2;
+  ballY = canvas.height/2;
+  // set ball speed and direction
+  let bs = ballSpeedSetting;
+  let directionX = (randomDir ? (Math.random() > 0.5 ? 1 : -1) : 1);
+  let directionY = (Math.random() > 0.5 ? 1 : -1);
+  ballSpeedX = bs * directionX;
+  ballSpeedY = bs * directionY;
+}
 
 function moveAI() {
-  // Get the AI speed for current difficulty setting
-  let aiSpeed = aiSettings[currentDifficulty].aiSpeed;
+  let aiSpeed = difficultySettings[currentDifficulty].aiSpeed;
   let paddleMid = rightY + paddleHeight/2;
   if (paddleMid < ballY - 10)
     rightY += aiSpeed;
   else if (paddleMid > ballY + 10)
     rightY -= aiSpeed;
-  // Don't let paddle go out of bounds
   rightY = Math.max(0, Math.min(canvas.height - paddleHeight, rightY));
 }
 
-// Draw everything
 function draw() {
   ctx.clearRect(0,0,canvas.width,canvas.height);
 
@@ -89,7 +151,6 @@ function draw() {
   ctx.closePath();
 }
 
-// Move ball and paddles
 function update() {
   // Move player paddle
   if (upPressed && leftY > 0) leftY -= paddleSpeed;
@@ -106,31 +167,69 @@ function update() {
     ballSpeedY = -ballSpeedY;
 
   // Left paddle collision
-  if (ballX-ballRadius < 20 && ballY > leftY && ballY < leftY+paddleHeight) {
+  if (
+    ballX-ballRadius < 20 &&
+    ballY > leftY &&
+    ballY < leftY+paddleHeight &&
+    ballSpeedX < 0
+  ) {
     ballSpeedX = -ballSpeedX;
     ballX = 20+ballRadius; // Prevent sticking
   }
 
   // Right paddle collision
-  if (ballX+ballRadius > canvas.width-20 && ballY > rightY && ballY < rightY+paddleHeight) {
+  if (
+    ballX+ballRadius > canvas.width-20 &&
+    ballY > rightY &&
+    ballY < rightY+paddleHeight &&
+    ballSpeedX > 0
+  ) {
     ballSpeedX = -ballSpeedX;
     ballX = canvas.width-20-ballRadius; // Prevent sticking
   }
 
-  // Score reset
-  if (ballX-ballRadius < 0 || ballX+ballRadius > canvas.width) {
-    ballX = canvas.width/2;
-    ballY = canvas.height/2;
-    // Change direction
-    ballSpeedX = -ballSpeedX;
-    ballSpeedY = 4 * (Math.random() > 0.5 ? 1 : -1);
+  // Missed (ball goes past player)
+  if (ballX-ballRadius < 0) {
+    missed += 1;
+    missedCounter.textContent = `Missed: ${missed} / ${maxMisses}`;
+    if (missed >= maxMisses) {
+      showGameOver();
+      return;
+    }
+    resetPositions();
+  }
+
+  // AI missed (not counted)
+  if (ballX+ballRadius > canvas.width) {
+    resetPositions();
   }
 }
 
-// Game loop
+function showGameOver() {
+  running = false;
+  gameOverMsg.innerHTML = `Game Over!<br>You missed ${missed} times.<br>Press "Restart" or Space to try again.`;
+  gameOverDiv.style.display = "flex";
+}
+
+function hideGameOver() {
+  gameOverDiv.style.display = "none";
+}
+
+function resetGame() {
+  missed = 0;
+  maxMisses = difficultySettings[currentDifficulty].maxMisses;
+  ballSpeedSetting = difficultySettings[currentDifficulty].ballSpeed;
+  missedCounter.textContent = `Missed: ${missed} / ${maxMisses}`;
+  running = true;
+  hideGameOver();
+  resetPositions(false);
+}
+
 function loop() {
-  update();
-  draw();
+  if (running) {
+    update();
+    draw();
+  }
   requestAnimationFrame(loop);
 }
 
@@ -138,6 +237,9 @@ function loop() {
 document.addEventListener('keydown', function(e){
   if (e.key === "ArrowUp") upPressed = true;
   if (e.key === "ArrowDown") downPressed = true;
+  if (!running && e.key === " " ) {
+    resetGame();
+  }
 });
 document.addEventListener('keyup', function(e){
   if (e.key === "ArrowUp") upPressed = false;
@@ -147,15 +249,17 @@ document.addEventListener('keyup', function(e){
 // Listen to difficulty selector
 selectDifficulty.addEventListener('change', function() {
   currentDifficulty = selectDifficulty.value;
-  // Reset game when difficulty changes
-  leftY = canvas.height/2 - paddleHeight/2;
-  rightY = canvas.height/2 - paddleHeight/2;
-  ballX = canvas.width/2;
-  ballY = canvas.height/2;
-  ballSpeedX = 4 * (Math.random() > 0.5 ? 1 : -1);
-  ballSpeedY = 4 * (Math.random() > 0.5 ? 1 : -1);
+  resetGame();
 });
 
+// Restart button click handler
+restartBtn.addEventListener('click', function() {
+  resetGame();
+});
+
+// Initialize and start game
+currentDifficulty = selectDifficulty.value;
+resetGame();
 loop();
 </script>
 </body>
